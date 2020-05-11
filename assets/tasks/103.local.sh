@@ -6,7 +6,8 @@ process_local_legend="LOCAL DOTFILES";
 process_local() {
 	local _uname="${1}" _hname="${2}" _tags="${3}" _nflag="${4}" _src="";
 	if [ -e "../dotfiles_private/${_uname}@${_hname%.}" ]; then
-		if [ "${_hname%.}" = "$(hostname)" ]; then
+		if [ "${_hname%.}" = "$(hostname)" ]\
+		&& [ "${_uname}" = "$(id -nu)" ]; then
 			msgf "(ignoring attempted transfer from local to local host)\n";
 			return 0;
 		fi;

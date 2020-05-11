@@ -6,7 +6,8 @@ process_shared_legend="SHARED DOTFILES";
 process_shared() {
 	local _uname="${1}" _hname="${2}" _tags="${3}" _nflag="${4}";
 	msgf "[1mTransfer shared dotfiles[0m: [4m%s@%s[0m" "${_uname}" "${_hname}";
-	if [ "${_hname%.}" = "$(hostname)" ]; then
+	if [ "${_hname%.}" = "$(hostname)" ]\
+	&& [ "${_uname}" = "$(id -nu)" ]; then
 		msgf "(ignoring attempted transfer from local to local host)\n";
 		return 0;
 	fi;
