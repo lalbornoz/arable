@@ -1,0 +1,146 @@
+
+MSGF_LOG_FNAME="";
+
+build_excludes() {
+	local _pname="" _IFS0="";
+	_IFS0="${IFS}"; IFS="
+";	for _pname in "${@}"; do
+		printf -- "- %s\n" "${_pname}";
+	done; IFS="${_IFS0}";
+};
+
+build_finish() { printf -- "- *\n"; };
+
+build_includes() {
+	local	_dname_top="${1}" _dname="${2:-}" _optionalfl="${3:-0}" _relfl="${4:-1}"	\
+		_topfl="${5:-1}" _dname_abs="${1}${2:+/${2}}" _dname_rel="" _dname_sub=""		\
+		_find_namefl="" _fname="" _IFS0="";
+	[ "${_topfl:-0}" -eq 0 ] && _find_namefl="-or -name *";
+	[ "${_relfl:-0}" -eq 0 ] && _dname_rel="${_dname_top%%/}${_dname:+/${_dname%%/}}/" || _dname_rel="${_dname:+${_dname%%/}/}";
+	[ -n "${_dname_rel}" ] && printf -- "+ %s\n" "${_dname_rel}";
+	_IFS0="${IFS}"; IFS="
+";	for _dname_sub in $(IFS=" "; cd "${_dname_abs}" && find					\
+			-maxdepth 1 -mindepth 1							\
+			-name '.*' ${_find_namefl} -type d -printf '%P\n'); do
+		if [ -e "${_dname_abs}/${_dname_sub}/.directory_optional" ]\
+		&& [ "${_optionalfl}" -ne 1 ]; then
+			continue;
+		fi;
+		if ! [ -e "${_dname_abs}/${_dname_sub}/.shared_directory" ]; then
+			printf -- "+ %s%s/***\n" "${_dname_rel}" "${_dname_sub}";
+			printf -- "+ %s%s/\n" "${_dname_rel}" "${_dname_sub}";
+		else
+			IFS="${_IFS0}" build_includes "${_dname_top}"				\
+				"${_dname:+${_dname}/}${_dname_sub}"				\
+				"${_optionalfl}" "${_relfl}" 0;
+		fi;
+	done;
+	for _fname in $(IFS=" "; cd "${_dname_abs}" && find					\
+			-maxdepth 1 -mindepth 1							\
+			\( -name '.*' ${_find_namefl} \)					\
+			-not -type d -printf '%P\n'); do
+		printf -- "+ %s%s\n" "${_dname_rel}" "${_fname}";
+	done; IFS="${_IFS0}";
+};
+
+filter() {
+	local _hname="${1}" _uname="${2}" _lfilter="${3}" _llist="${4}";
+	if [ -n "${_llist}" ]; then
+		if ! lsearch "${_llist}" "${_hname}"\
+		&& ! lsearch "${_llist}" "${_hname%.}"\
+		&& ! lsearch "${_llist}" "${_hname%.}."\
+		&& ! lsearch "${_llist}" "${_uname}@${_hname}"\
+		&& ! lsearch "${_llist}" "${_uname}@${_hname%.}"\
+		&& ! lsearch "${_llist}" "${_uname}@${_hname%.}."; then
+			return 0;
+		fi;
+	fi;
+	if [ -n "${_lfilter}" ]; then
+		if lsearch "${_lfilter}" "${_hname}"\
+		|| lsearch "${_lfilter}" "${_hname%.}"\
+		|| lsearch "${_lfilter}" "${_hname%.}."\
+		|| lsearch "${_lfilter}" "${_uname}@${_hname}"\
+		|| lsearch "${_lfilter}" "${_uname}@${_hname%.}"\
+		|| lsearch "${_lfilter}" "${_uname}@${_hname%.}.".; then
+			return 0;
+		fi;
+	fi;
+	return 1;
+};
+
+lsearch() {
+	local _list="${1}" _litem="${2}";
+	set -- ${_list};
+	while [ ${#} -gt 0 ]; do
+		if [ "${1}" = "${_litem}" ]; then
+			return 0;
+		else
+			shift;
+		fi;
+	done; return 1;
+};
+
+mode_push() {
+	local _nflag="${1}" _uname="${2}" _hname="${3}" _mode="";
+	if [ -e "../dotfiles_private/${_uname}@${_hname%.}/.directory_mode" ]\
+	&& _mode="$(cat "../dotfiles_private/${_uname}@${_hname%.}/.directory_mode")"\
+	&& [ -n "${_mode}" ]; then
+		msgf "[90mSetting remote directory mode to %s.[0m\n" "${_mode}";
+		if [ -z "${_nflag}" ]; then
+			ssh -l "${_uname}" "${_hname}" "chmod ${_mode} .";
+		else
+			echo ssh -l "${_uname}" "${_hname}" "chmod ${_mode} .";
+		fi;
+	fi;
+};
+
+msgf() {
+	[ "x${1}" = "x--" ] && { local _cflag=1; shift; } || local _cflag=0;
+	local _attrs="${1:-}" _fmt="${2:-}" _msg="" _ts="$(date +"%d-%^b-%Y %H:%M:%S")"; shift $(((2>$#)?$?:2));
+	case "${_cflag}" in
+	0)	printf "%s${_fmt}[0m" "${_attrs:+[${_attrs}m}" "${@}" >/dev/tty;
+		[ -n "${MSGF_LOG_FNAME}" ] && printf "${_fmt}" "${@}" >>"${MSGF_LOG_FNAME}"; ;;
+	1)	printf "%s%s >>> ${_fmt}[0m" "${_attrs:+[${_attrs}m}" "${_ts}" "${@}" >/dev/tty;
+		[ -n "${MSGF_LOG_FNAME}" ] && printf "%s >>> ${_fmt}" "${_ts}" "${@}" >>"${MSGF_LOG_FNAME}"; ;;
+	esac;
+};
+
+msgf_log_fname() { MSGF_LOG_FNAME="${1}"; touch "${MSGF_LOG_FNAME}"; };
+
+rsync_pull() {
+	local	_nflag="${1}" _uname="${2}" _hname="${3}" _dest="${4}"		\
+		_include_fname="${5}" _rsync_args_extra="${6}" _src="${7}";
+	if [ "${#}" -eq 0 ]; then
+		echo "error: melp?"; exit 1;
+	else
+		rsync	-aHiPve ssh						\
+			--delete						\
+			"${_include_fname:+--include-from=${_include_fname}}"	\
+			--no-group						\
+			--no-owner						\
+			${_rsync_args_extra}					\
+			${_nflag:+-n}						\
+			"${_uname}@${_hname}:${_src}"				\
+			"${_dest}";
+	fi;
+};
+
+rsync_push() {
+	local	_nflag="${1}" _uname="${2}" _hname="${3}" _dest="${4}"		\
+		_include_fname="${5}" _rsync_args_extra="${6}" _src=""; shift 6;
+	if [ "${#}" -eq 0 ]; then
+		echo "error: melp?"; exit 1;
+	else
+		rsync	-aHiPve ssh						\
+			--delete						\
+			"${_include_fname:+--include-from=${_include_fname}}"	\
+			--no-group						\
+			--no-owner						\
+			${_rsync_args_extra}					\
+			"${_nflag:+-n}"						\
+			"${@}"							\
+			"${_uname}@${_hname}:${_dest}";
+	fi;
+};
+
+# vim:ft=sh foldmethod=marker sw=8 ts=8 tw=120

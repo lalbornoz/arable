@@ -1,0 +1,57 @@
+#
+# N.B.	comments appended to non-comment lines are not supported.
+#
+
+#
+# Local servers
+# [user@]host			domain(s)
+#
+[local]
+root@pc1.local			DISABLED dotfiles backup_host
+root@laptop1.local		DISABLED dotfiles backup_host
+
+#
+# Remote {server,VPS} (non-root)
+# [user@]host			domain(s)
+#
+[remote]
+user@some1.where.		dotfiles backup_maildir
+user@some2.where.		dotfiles backup_irssi_logs backup_maildir
+
+#
+# Remote {server,VPS} (root)
+# [user@]host			domain(s)
+#
+[servers]
+root@some1.where.		dotfiles update_debian_host backup_host_logs backup_host
+root@some2.where.		dotfiles update_debian_host backup_calcard backup_host_logs backup_host
+
+#
+# Defaults
+#
+[.defaults]
+continue_soft_failure=yes
+dry_run=no
+email_output=yes
+exclude_hosts=
+limit_hosts=
+logging=global
+log_domain=domain_%domain%_%local_uname%@%local_hname%_%timestamp%.log
+log_global=arable_%domains%_%local_uname%@%local_hname%_%timestamp%.log
+log_host=host_%domain%_%uname%@%hname%_%local_uname%@%local_hname%_%timestamp%.log
+verbosity=1
+
+#
+# Domain schedule
+# domain			h    m    dom    dow    mon    depends
+#
+[.schedule]
+dotfiles			11   00   *      *      */4
+backup_calcard			11   30   *      *      */3
+backup_irssi_logs		11   20   *      *      */1
+backup_maildir			11   40   *      *      */2
+update_debian_host		DISABLED
+backup_host_logs		12   00   *      *      */1    update_debian_host
+backup_host			12   10   *      *      */3    dotfiles update_debian_host
+
+# vim:filetype=cfg

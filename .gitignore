@@ -1,2 +1,4 @@
 *.sw[op]
-assets/hosts
+**/hosts
+**/private
+**/shared
